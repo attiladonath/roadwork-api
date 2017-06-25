@@ -1,0 +1,514 @@
+swagger: '2.0'
+
+info:
+  title: "Roadwork API"
+  version: "0.1.0"
+
+consumes:
+  - application/json
+produces:
+  - application/json
+
+paths:
+  /:
+    get:
+      description: Used for testing the API availability.
+      produces:
+        - text/plain
+      responses:
+          200:
+            description: A success message.
+            schema:
+              type: string
+
+  /issues:
+    get:
+      description: Lists issues with their latest version.
+      parameters:
+        - name: around
+          in: query
+          description: Latitude and longitude around which we are searching. Coordinates should be concatenated by "," like "47.5105718,19.0560086".
+          required: false
+          type: string
+        - name: distance
+          in: query
+          description: The radius of the circle in kilometers around the given coordinates inside which we are searching. Only usable if parameter "around" is given.
+          required: false
+          type: number
+          format: double
+        - name: states
+          in: query
+          description: A comma separated list of state labels to filter the list by.
+          required: false
+          type: string
+        - name: tags
+          in: query
+          description: A comma separated list of tag names to filter the list by.
+          required: false
+          type: string
+        - name: sort
+          in: query
+          description: A comma separated list of attributes to sort by. If an attribute is prefixed with a "-" sign, it means descending sorting. Valid attributes are "distance", "state", "importance", "creation_date", "update_date". Sorting by distance is only possible if parameter "around" is given.
+          required: false
+          type: string
+        - name: page
+          in: query
+          description: Used for paging, the 1 based ordinal number of the page.
+          required: false
+          type: integer
+          format: int32
+        - name: items_per_page
+          in: query
+          description: Used for paging, the maximum number of items on one page.
+          required: false
+          type: integer
+          format: int32
+      responses:
+        200:
+          description: An array of issues. If no sorting is given, issues are sorted by update date, most recent first by default.
+          schema:
+            type: object
+            properties:
+              data:
+                type: array
+                items:
+                  $ref: '#/definitions/Issue'
+              pagination:
+                $ref: '#/definitions/PaginationData'
+        422:
+          description: Error while processing the request, e.g. the query parameters are malformed.
+          schema:
+            type: object
+            properties:
+              error:
+                $ref: '#/definitions/Error'
+    post:
+      description: Creates a new issue.
+      parameters:
+        - name: issue_version
+          in: body
+          description: The first version of the issue.
+          required: true
+          schema:
+            $ref: '#/definitions/IssueVersionInput'
+      responses:
+        201:
+          description: The newly created issue.
+          schema:
+            type: object
+            properties:
+              data:
+                $ref: '#/definitions/Issue'
+        400:
+          description: The request is malformed.
+          schema:
+            type: object
+            properties:
+              error:
+                $ref: '#/definitions/Error'
+        422:
+          description: Error while processing the request, e.g. a constraint is not satisfied.
+          schema:
+            type: object
+            properties:
+              error:
+                $ref: '#/definitions/Error'
+
+  /issues/{id}:
+    get:
+      description: Returns the issue with all of its versions.
+      parameters:
+        - name: id
+          in: path
+          description: The identifier of the issue.
+          required: true
+          type: integer
+          format: int32
+      responses:
+        200:
+          description: The issue with the given identifier.
+          schema:
+            type: object
+            properties:
+              data:
+                $ref: '#/definitions/Issue'
+        404:
+          description: The given issue is not found.
+          schema:
+            type: object
+            properties:
+              error:
+                $ref: '#/definitions/Error'
+
+  /issues/{id}/votes:
+    post:
+      description: Changes the issue's importance by voting either up or down.
+      parameters:
+        - name: id
+          in: path
+          description: The identifier of the issue.
+          required: true
+          type: integer
+          format: int32
+        - name: vote
+          in: body
+          description: The vote, either "up" or "down".
+          required: true
+          schema:
+            type: string
+      responses:
+        200:
+          description: The updated importance of the issue.
+          schema:
+            type: object
+            properties:
+              data:
+                type: integer
+                format: int32
+        400:
+          description: The request was malformed.
+          schema:
+            type: object
+            properties:
+              error:
+                $ref: '#/definitions/Error'
+        404:
+          description: The given issue is not found.
+          schema:
+            type: object
+            properties:
+              error:
+                $ref: '#/definitions/Error'
+        422:
+          description: Malformed parameter, most likely the given vote was not "up" or "down".
+          schema:
+            type: object
+            properties:
+              error:
+                $ref: '#/definitions/Error'
+
+  /issues/{id}/versions:
+    get:
+      description: Returns all versions of the given issue.
+      parameters:
+        - name: id
+          in: path
+          description: The identifier of the issue.
+          required: true
+          type: integer
+          format: int32
+      responses:
+        200:
+          description: An array of issue versions.
+          schema:
+            type: object
+            properties:
+              data:
+                type: array
+                items:
+                  $ref: '#/definitions/IssueVersion'
+              pagination:
+                $ref: '#/definitions/PaginationData'
+        404:
+          description: The given issue is not found.
+          schema:
+            type: object
+            properties:
+              error:
+                $ref: '#/definitions/Error'
+    post:
+      description: Adds a new version to the given issue.
+      parameters:
+        - name: id
+          in: path
+          description: The identifier of the issue.
+          required: true
+          type: integer
+          format: int32
+        - name: issue_version
+          in: body
+          description: The new version of the issue.
+          required: false
+          schema:
+            $ref: '#/definitions/IssueVersionInput'
+      responses:
+        201:
+          description: The newly created issue version.
+          schema:
+            type: object
+            properties:
+              data:
+                $ref: '#/definitions/IssueVersion'
+        400:
+          description: The request was malformed.
+          schema:
+            type: object
+            properties:
+              error:
+                $ref: '#/definitions/Error'
+        404:
+          description: The given issue is not found.
+          schema:
+            type: object
+            properties:
+              error:
+                $ref: '#/definitions/Error'
+        422:
+          description: Error while processing the request, e.g. a constraint is not satisfied.
+          schema:
+            type: object
+            properties:
+              error:
+                $ref: '#/definitions/Error'
+
+  /issues/{id}/versions/{version}/approved:
+    put:
+      description: Changes the approval state of an issue version.
+      parameters:
+        - name: id
+          in: path
+          description: The identifier of the issue.
+          required: true
+          type: integer
+          format: int32
+        - name: version
+          in: path
+          description: The identifier of the issue version.
+          required: true
+          type: integer
+          format: int32
+        - name: approved
+          in: body
+          description: The approval state of the issue version.
+          required: true
+          schema:
+            type: boolean
+      responses:
+        200:
+          description: The updated value of approval state.
+          schema:
+            type: object
+            properties:
+              data:
+                type: boolean
+        404:
+          description: The given issue or issue version is not found.
+          schema:
+            type: object
+            properties:
+              error:
+                $ref: '#/definitions/Error'
+        422:
+          description: Malformed parameter, most likely the given approval state was not a boolean value.
+          schema:
+            type: object
+            properties:
+              error:
+                $ref: '#/definitions/Error'
+
+  /tags:
+    get:
+      description: Lists tags.
+      parameters:
+        - name: starts_with
+          in: query
+          description: Filter tags by the beginning of their name. The nice name is used for searching, but the matching is case insensitive.
+          required: false
+          type: string
+        - name: contains
+          in: query
+          description: Filter tags by their name, the match can be anywhere in the string. The nice name is used for searching, but the matching is case insensitive.
+          required: false
+          type: string
+        - name: page
+          in: query
+          description: Used for paging, the 1 based ordinal number of the page.
+          required: false
+          type: integer
+          format: int32
+        - name: items_per_page
+          in: query
+          description: Used for paging, the maximum number of items on one page.
+          required: false
+          type: integer
+          format: int32
+      responses:
+        200:
+          description: An array of tags.
+          schema:
+            type: object
+            properties:
+              data:
+                type: array
+                items:
+                  $ref: '#/definitions/Tag'
+              pagination:
+                $ref: '#/definitions/PaginationData'
+
+  /states:
+    get:
+      description: Lists states.
+      responses:
+        200:
+          description: An array of states.
+          schema:
+            type: array
+            items:
+              type: object
+              properties:
+                data:
+                  $ref: '#/definitions/State'
+
+definitions:
+  Issue:
+    type: object
+    properties:
+      id:
+        type: integer
+        format: int32
+        description: The identifier of the issue.
+      importance:
+        type: integer
+        format: int32
+        default: 0
+        description: The voted importance of the issue.
+      versions:
+        type: array
+        items:
+          $ref: '#/definitions/IssueVersion'
+
+  IssueVersion:
+    type: object
+    properties:
+      version:
+        type: integer
+        format: int32
+        description: The identifier of the issue version - it is a timestamp which shows when the version was created.
+      comment:
+        type: string
+        description: An arbitrary comment to the issue version, e.g. summarizing the modifications made.
+      state:
+        $ref: '#/definitions/State'
+      coordinates:
+        $ref: '#/definitions/Coordinates'
+      description:
+        type: string
+        description: Textual details about the issue. Not to be confused with the comment, this field is related to the whole issue, not just to this specific version.
+      tags:
+        type: array
+        items:
+          $ref: '#/definitions/Tag'
+      images:
+        type: array
+        items:
+          type: string
+          description: The URL of the image.
+      streetview:
+        type: string
+        description: The URL which shows the issue in Google Street View.
+
+  IssueVersionInput:
+    type: object
+    properties:
+      version_to_restore:
+          type: integer
+          format: int32
+          description: The identifier of a previous version to restore. This parameter is mutually exclusive with all the other parameters except comment. It must be a valid version of the issue being processed.
+      comment:
+        type: string
+        description: An arbitrary comment to the issue version, e.g. summarizing the modifications made.
+      state:
+        type: string
+        description: The label of the state to assign to the issue with this version.
+      coordinates:
+        $ref: '#/definitions/Coordinates'
+      description:
+        type: string
+        description: Textual details about the issue. Not to be confused with the comment, this field is related to the whole issue, not just to this specific version.
+      tags:
+        type: array
+        items:
+          type: string
+          description: Either the name of an existing tag or an arbitrary string tag name.
+      images:
+        type: array
+        items:
+          type: string
+          description: Either the URL of an existing image or base64 encoded image data.
+      streetview:
+        type: string
+        description: The Google Street View URL which shows the issue.
+
+  State:
+    type: object
+    properties:
+      label:
+        type: string
+        description: The identifier of the state.
+      name:
+        type: string
+        description: The nice name of the state.
+      description:
+        type: string
+        description: An explanation of the state's meaning and purpose.
+
+  Coordinates:
+    type: object
+    properties:
+      latitude:
+        type: number
+        format: decimal
+        description: Latitude of the represented point.
+      longitude:
+        type: number
+        format: decimal
+        description: Longitude of the represented point.
+
+  Tag:
+    type: object
+    properties:
+      label:
+        type: string
+        description: The identifier of the tag, the transliterated name, in lower snake case.
+      name:
+        type: string
+        description: The nice name of the tag.
+
+  PaginationData:
+    type: object
+    properties:
+      total:
+        type: integer
+        format: int32
+        description: The total number of items on all pages together.
+      pages:
+        type: integer
+        format: int32
+        description: The total number of pages.
+      has_next:
+        type: boolean
+        description: Shows whether there is a next page.
+      has_previous:
+        type: boolean
+        description: Shows whether there is a previous page.
+      next_page:
+        type: integer
+        format: int32
+        description: The ordinal number of the next page.
+      previous_page:
+        type: integer
+        format: int32
+        description: The ordinal number of the previous page.
+
+  Error:
+    type: object
+    properties:
+      message:
+        type: string
+        description: A human readable error message.
+      code:
+        type: string
+        description: A machine readable error code.
+      reference:
+        type: string
+        description: A machine readable reference to the point where the error occurred.
